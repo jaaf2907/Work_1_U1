@@ -1,0 +1,209 @@
+---
+title: "Agromorphological traits dataset of butterfly pea accessions from Thailand, Indonesia, and Brazil"
+author: "Juan Alberto Alvarez Farroñan"
+format:
+  html:
+    toc: true
+    toc-location: left
+    toc-expand: 4
+    number-sections: true
+    self-contained: true
+    output-file: "index"
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+  echo: false
+---
+
+# Referencias
+
+- https://doi.org/10.1016/J.DIB.2024.110079
+
+# Librerias y configuración
+
+```{r}
+#| label: setup
+
+source('https://inkaverse.com/setup.r')
+```
+
+# Importación de datos
+
+> url: https://docs.google.com/spreadsheets/d/1xFIuUjLF1F2XDSoYLDKs-SBmSDECIopNJAcabvkdlEw/edit?gid=1125441718#gid=1125441718
+
+```{r}
+url <- "https://docs.google.com/spreadsheets/d/1xFIuUjLF1F2XDSoYLDKs-SBmSDECIopNJAcabvkdlEw/edit?gid=1125441718#gid=1125441718"
+
+gs <- as_sheets_id(url)
+
+datos <- range_read(ss = gs, sheet = "Table1")
+
+datos <- datos %>%
+  rename_all(~str_replace_all(., " ", "_"))
+
+
+str(datos)
+``` 
+
+# Limpieza de datos
+
+```{r}
+datos <- datos %>%
+  filter(!is.na(Accessions_Code))
+```
+
+# Conversión de variables cualitativas
+```{r}
+qualitative_vars <- c(
+  "Flower_Type",
+  "Number_of_Leaves",
+  "Leaf_Shape",
+  "Flower_Color",
+  "Seed_Color",
+  "Seed_Shape"
+)
+
+datos <- datos %>%
+  mutate(
+    across(
+      all_of(qualitative_vars),
+      as.factor
+    )
+  )
+str(datos)
+```
+
+# Promedio por accesión
+
+```{r}
+datos_mean <- datos %>%
+  group_by(Accessions_Code) %>%
+  summarise(
+    across(
+      where(is.numeric) & !any_of("Replication"),
+      mean,
+      na.rm = TRUE
+    )
+  )
+
+
+str(datos_mean)
+```
+
+# Preparación de matriz para PCA
+
+```{r}
+accession <- datos_mean$Accessions_Code
+
+pca_data <- datos_mean %>%
+  dplyr::select(
+    Plant_Height_(cm),
+    Leaf_Length_(cm),
+    Leaf_Width_(cm),
+    Flowering_Age_(DAP),
+    Flower_Length_(cm),
+    Flower_Width_(cm),
+    Weight_of_1_Fresh_Flower_(g),
+    Calix_Length_(cm),
+    Weight_of_Fresh_Flower_per_Plant__(g),
+    Weight_of_Total_Fresh_Flower_(g),
+    Pod_Length__(cm),
+    Pod_Width_(mm),
+    Number_of_Pods_per_Plant,
+    Weight_of_Pods_per_Plant_(g),
+    Number_of_Total_Pods,
+    Weight_of_Total_Pods_(g),
+    Seed_Length_(mm),
+    Seed_Width_(mm),
+    Seed_Diameter_(mm),
+    Number_of_Seed_per_Pod,
+    Weight_of_Seed_per_Plant_(g),
+    Weight_of_Total_Seed_(g),
+    Weight_of_100_Seed_(g)
+  )
+
+```
+
+# Selección de variables cuantitativas
+
+```{r}
+pca_data <- as.data.frame(pca_data)
+
+
+rownames(pca_data) <- accession
+
+
+head(pca_data)
+```
+
+# PCA
+
+```{r}
+mv <- PCA(
+  X = pca_data,
+  scale.unit = TRUE,
+  graph = FALSE
+)
+
+summary(
+  mv,
+  nbelements = Inf,
+  nb.dec = 2
+)
+
+pcainfo <- factoextra::get_pca_var(mv)
+
+pcainfo$cor
+
+pcainfo$contrib
+```
+
+# Selección de variables cuantitativas
+
+```{r}
+var <- plot.PCA(
+  mv,
+  choix="var",
+  cex=0.7
+)
+
+
+ind <- plot.PCA(
+  mv,
+  choix="ind",
+  label="ind",
+  cex=0.7
+)
+
+list(var, ind) %>%
+plot_grid(
+  plotlist = .,
+  ncol = 2,
+  labels = "auto"
+)
+```
+
+# HCA
+
+```{r}
+cls <- HCPC(
+  mv,
+  graph = FALSE
+)
+
+plot.HCPC(
+  cls,
+  choice = "map",
+  nb.clust = 2,
+  draw.tree = FALSE
+)
+
+
+plot.HCPC(
+  cls,
+  choice="tree",
+  nb.clust=2,
+  draw.tree=FALSE
+)
+```
